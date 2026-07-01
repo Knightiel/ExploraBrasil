@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% block title %}{{ perfil.get_full_name|default:perfil.username }} — ExploraBrasil{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <!-- Profile header -->
+  <div class="card border-0 shadow-sm rounded-4 mb-4">
+    <div class="card-body p-4">
+      <div class="d-flex align-items-center gap-4 flex-wrap">
+        {% if perfil.foto_perfil %}
+          <img src="{{ perfil.foto_perfil }}" class="rounded-circle shadow" width="96" height="96" style="object-fit:cover">
+        {% else %}
+          <div class="rounded-circle bg-success d-flex align-items-center justify-content-center text-white fw-bold shadow"
+               style="width:96px;height:96px;font-size:2.5rem">{{ perfil.username|first|upper }}</div>
+        {% endif %}
+        <div class="flex-grow-1">
+          <h3 class="fw-bold mb-0">{{ perfil.get_full_name|default:perfil.username }}</h3>
+          <p class="text-muted mb-2">@{{ perfil.username }} · membro desde {{ perfil.date_joined|date:"M/Y" }}</p>
+          {% if perfil.bio %}<p class="mb-2">{{ perfil.bio }}</p>{% endif %}
+          <div class="d-flex gap-4">
+            <div class="text-center">
+              <div class="fw-bold">{{ perfil.total_seguidores }}</div>
+              <small class="text-muted">seguidores</small>
+            </div>
+            <div class="text-center">
+              <div class="fw-bold">{{ perfil.total_seguindo }}</div>
+              <small class="text-muted">seguindo</small>
+            </div>
+            <div class="text-center">
+              <div class="fw-bold">{{ destinos|length }}</div>
+              <small class="text-muted">destinos</small>
+            </div>
+          </div>
+        </div>
+        {% if user.is_authenticated and user.pk != perfil.pk %}
+        <button id="follow-btn"
+                class="btn {% if seguindo %}btn-outline-success{% else %}btn-success{% endif %}"
+                onclick="toggleSeguir({{ perfil.pk }})">
+          <i class="bi bi-person-{% if seguindo %}check{% else %}plus{% endif %} me-1"></i>
+          {% if seguindo %}Seguindo{% else %}Seguir{% endif %}
+        </button>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-8">
+      <!-- Destinos -->
+      <h5 class="fw-bold mb-3"><i class="bi bi-map text-success me-2"></i>Destinos cadastrados</h5>
+      {% if destinos %}
+      <div class="row g-3">
+        {% for d in destinos %}
+        <div class="col-sm-6">
+          <a href="/destinos/{{ d.pk }}/" class="card text-decoration-none border-0 shadow-sm h-100">
+            <div style="height:130px;overflow:hidden">
+              {% if d.foto_principal %}
+              <img src="{{ d.foto_principal }}" class="w-100 h-100" style="object-fit:cover">
+              {% else %}
+              <div class="w-100 h-100 bg-light d-flex align-items-center justify-content-center">
+                <i class="bi bi-image text-muted fs-3"></i>
+              </div>
+              {% endif %}
+            </div>
+            <div class="card-body py-2 px-3">
+              <h6 class="fw-bold text-dark mb-0">{{ d.nome }}</h6>
+              <small class="text-muted">{{ d.categoria.get_nome_display }}</small>
+            </div>
+          </a>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="text-center text-muted py-4">
+        <i class="bi bi-map display-5"></i>
+        <p class="mt-2">Nenhum destino cadastrado ainda.</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="col-lg-4">
+      <!-- Grupos -->
+      <h5 class="fw-bold mb-3"><i class="bi bi-people text-success me-2"></i>Grupos de expedição</h5>
+      {% if grupos %}
+        {% for g in grupos %}
+        <a href="/grupos/{{ g.pk }}/" class="card text-decoration-none border-0 shadow-sm mb-3">
+          <div class="card-body py-2 px-3">
+            <h6 class="fw-bold text-dark mb-0">{{ g.nome }}</h6>
+            <small class="text-muted">{{ g.destino.nome }}</small>
+            <div class="mt-1">
+              <span class="badge bg-success bg-opacity-10 text-success">
+                <i class="bi bi-people me-1"></i>{{ g.total_membros }} membros
+              </span>
+            </div>
+          </div>
+        </a>
+        {% endfor %}
+      {% else %}
+      <div class="text-center text-muted py-4">
+        <i class="bi bi-people display-5"></i>
+        <p class="mt-2">Nenhum grupo ainda.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CSRF = '{{ csrf_token }}';
+function toggleSeguir(id) {
+  fetch(`/api/auth/usuarios/${id}/seguir/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': CSRF }
+  }).then(r => r.json()).then(d => {
+    const btn = document.getElementById('follow-btn');
+    if (d.seguindo) {
+      btn.className = 'btn btn-outline-success';
+      btn.innerHTML = '<i class="bi bi-person-check me-1"></i>Seguindo';
+    } else {
+      btn.className = 'btn btn-success';
+      btn.innerHTML = '<i class="bi bi-person-plus me-1"></i>Seguir';
+    }
+  });
+}
+</script>
+{% endblock %}

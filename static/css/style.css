@@ -1,0 +1,46 @@
+/* ExploraBrasil – custom styles */
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+/* Navbar */
+.navbar-brand { font-size: 1.2rem; }
+
+/* Cards */
+.dest-card { transition: transform .2s, box-shadow .2s; }
+.dest-card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,.12) !important; }
+
+/* Map marker override */
+.map-marker { line-height: 1; filter: drop-shadow(0 2px 4px rgba(0,0,0,.3)); }
+
+/* Leaflet popup */
+.leaflet-popup-content a { color: #198754; font-weight: 600; }
+
+/* Star rating */
+.star-btn { background: none; border: none; font-size: 1.5rem; color: #dee2e6; cursor: pointer; padding: 0 2px; }
+.star-btn:hover, .star-btn.active { color: #ffc107; }
+
+/* Gallery */
+.gallery-thumb { transition: opacity .2s, border .2s; border: 2px solid transparent; }
+.gallery-thumb.active, .gallery-thumb:hover { opacity: 1 !important; border-color: #198754; }
+
+/* Comment thread */
+.comment-thread { border-left: 3px solid #e9ecef; padding-left: 1rem; }
+
+/* Difficulty badges */
+.diff-facil    { background: #d1e7dd; color: #0f5132; }
+.diff-moderado { background: #fff3cd; color: #664d03; }
+.diff-dificil  { background: #f8d7da; color: #842029; }
+
+/* Utility */
+.rounded-4 { border-radius: 1rem !important; }
+.text-success { color: #198754 !important; }
+
+/* Hero section */
+.hero { padding-top: 72px; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #f1f1f1; }
+::-webkit-scrollbar-thumb { background: #198754; border-radius: 3px; }

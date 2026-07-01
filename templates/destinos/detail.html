@@ -1,0 +1,528 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ destino.nome }} — ExploraBrasil{% endblock %}
+
+{% block extra_css %}
+<style>
+  #map-detail { height: 300px; border-radius: .75rem; }
+  .gallery-thumb { width: 80px; height: 60px; object-fit: cover; border-radius: .5rem; cursor: pointer; opacity: .7; transition: opacity .2s; }
+  .gallery-thumb:hover, .gallery-thumb.active { opacity: 1; border: 2px solid #198754; }
+  .star-btn { background: none; border: none; font-size: 1.6rem; color: #dee2e6; cursor: pointer; transition: color .1s; }
+  .star-btn:hover, .star-btn.active { color: #ffc107; }
+  .comment-thread { border-left: 3px solid #e9ecef; padding-left: 1rem; }
+  .diff-facil { background:#d1e7dd; color:#0f5132; }
+  .diff-moderado { background:#fff3cd; color:#664d03; }
+  .diff-dificil { background:#f8d7da; color:#842029; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+  <!-- Breadcrumb -->
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="/" class="text-success">Início</a></li>
+      <li class="breadcrumb-item"><a href="/destinos/" class="text-success">Destinos</a></li>
+      <li class="breadcrumb-item active">{{ destino.nome }}</li>
+    </ol>
+  </nav>
+
+  <div class="row g-4">
+
+    <!-- Left: main info -->
+    <div class="col-lg-8">
+
+      <!-- Photo gallery -->
+      {% if destino.fotos.all %}
+      <div class="mb-3">
+        <img id="main-photo" src="{{ destino.fotos.first.url }}" class="w-100 rounded-3 shadow-sm"
+             style="height:380px;object-fit:cover" alt="{{ destino.nome }}">
+        {% if destino.fotos.count > 1 %}
+        <div class="d-flex gap-2 mt-2 flex-wrap">
+          {% for foto in destino.fotos.all %}
+          <img src="{{ foto.url }}" class="gallery-thumb {% if forloop.first %}active{% endif %}"
+               onclick="selectPhoto(this, '{{ foto.url }}')" alt="{{ foto.legenda }}">
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% else %}
+      <div class="bg-light rounded-3 d-flex align-items-center justify-content-center mb-3" style="height:280px">
+        <div class="text-center text-muted">
+          <i class="bi bi-image display-4"></i>
+          <p class="mt-2">Sem fotos ainda</p>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Title + actions -->
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <div>
+          <h1 class="fw-bold mb-1">{{ destino.nome }}</h1>
+          <div class="d-flex flex-wrap gap-2">
+            {% if destino.categoria %}
+            <span class="badge bg-dark">
+              <i class="bi {{ destino.categoria.icone }} me-1"></i>{{ destino.categoria.get_nome_display }}
+            </span>
+            {% endif %}
+            {% if destino.dificuldade %}
+            <span class="badge diff-{{ destino.dificuldade }}">{{ destino.get_dificuldade_display }}</span>
+            {% endif %}
+            {% if destino.distancia_km %}
+            <span class="badge bg-light text-dark border"><i class="bi bi-rulers me-1"></i>{{ destino.distancia_km }} km</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="d-flex gap-2">
+          {% if user.is_authenticated %}
+          <button id="fav-btn" class="btn {% if favoritado %}btn-danger{% else %}btn-outline-danger{% endif %} btn-sm"
+                  onclick="toggleFavorito({{ destino.pk }})">
+            <i class="bi bi-heart{% if favoritado %}-fill{% endif %} me-1"></i>
+            {% if favoritado %}Favoritado{% else %}Favoritar{% endif %}
+          </button>
+          {% endif %}
+          <a id="rota-btn" class="btn btn-success btn-sm" href="#map-detail"
+             onclick="tracarRota({{ destino.latitude }}, {{ destino.longitude }})">
+            <i class="bi bi-signpost-2 me-1"></i>Traçar Rota
+          </a>
+        </div>
+      </div>
+
+      <!-- Rating -->
+      <div class="d-flex align-items-center gap-3 mb-3">
+        <div>
+          <span class="fs-4 fw-bold text-warning">{{ destino.media_avaliacao }}</span>
+          <span class="text-muted small ms-1">({{ destino.total_avaliacoes }} avaliações)</span>
+        </div>
+        <div id="stars-display">
+          {% for i in "12345" %}
+          <span class="text-warning fs-5">{% if forloop.counter <= destino.media_avaliacao %}★{% else %}☆{% endif %}</span>
+          {% endfor %}
+        </div>
+        {% if user.is_authenticated %}
+        <div class="ms-auto">
+          <span class="text-muted small">Sua nota:</span>
+          {% for i in "12345" %}
+          <button class="star-btn {% if forloop.counter <= minha_nota %}active{% endif %}"
+                  data-nota="{{ forloop.counter }}"
+                  onclick="avaliar({{ destino.pk }}, {{ forloop.counter }})">★</button>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Description -->
+      {% if destino.descricao %}
+      <div class="card border-0 bg-light rounded-3 mb-4">
+        <div class="card-body">
+          <h5 class="fw-semibold"><i class="bi bi-info-circle text-success me-2"></i>Sobre</h5>
+          <p class="mb-0">{{ destino.descricao }}</p>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Map -->
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+          <h5 class="fw-semibold mb-3"><i class="bi bi-map text-success me-2"></i>Localização</h5>
+          <div id="map-detail"></div>
+          <p class="text-muted small mt-2 mb-0">
+            <i class="bi bi-geo me-1"></i>
+            {{ destino.latitude }}, {{ destino.longitude }}
+          </p>
+        </div>
+      </div>
+
+      <!-- Expedition groups -->
+      <div class="mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="fw-semibold mb-0"><i class="bi bi-people text-success me-2"></i>Grupos de Expedição</h5>
+          {% if user.is_authenticated %}
+          <button class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalNovoGrupo">
+            <i class="bi bi-plus me-1"></i>Criar Grupo
+          </button>
+          {% endif %}
+        </div>
+        {% if grupos %}
+        <div class="row g-3">
+          {% for grupo in grupos %}
+          <div class="col-md-6">
+            <div class="card border h-100">
+              <div class="card-body">
+                <h6 class="fw-bold">{{ grupo.nome }}</h6>
+                <p class="text-muted small mb-2">{{ grupo.descricao|default:"Sem descrição"|truncatechars:80 }}</p>
+                {% if grupo.data_expedicao %}
+                <p class="small mb-2"><i class="bi bi-calendar3 me-1 text-success"></i>{{ grupo.data_expedicao|date:"d/m/Y H:i" }}</p>
+                {% endif %}
+                <div class="d-flex justify-content-between align-items-center">
+                  <span class="badge bg-success bg-opacity-10 text-success">
+                    <i class="bi bi-people me-1"></i>{{ grupo.total_membros }}/{{ grupo.vagas }}
+                  </span>
+                  <a href="/grupos/{{ grupo.pk }}/" class="btn btn-sm btn-outline-success">Ver grupo</a>
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-3 text-muted">
+          <i class="bi bi-people display-6"></i>
+          <p class="mt-2 mb-0">Nenhum grupo criado ainda.</p>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Meeting points -->
+      {% if pontos_encontro %}
+      <div class="mb-4">
+        <h5 class="fw-semibold mb-3"><i class="bi bi-pin-map text-success me-2"></i>Pontos de Encontro</h5>
+        <div class="row g-2">
+          {% for ponto in pontos_encontro %}
+          <div class="col-md-6">
+            <div class="card border-start border-success border-3">
+              <div class="card-body py-2">
+                <h6 class="fw-semibold mb-0">{{ ponto.nome }}</h6>
+                <p class="text-muted small mb-1">{{ ponto.descricao|default:"" }}</p>
+                <small class="text-muted"><i class="bi bi-geo me-1"></i>{{ ponto.latitude }}, {{ ponto.longitude }}</small>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Comments -->
+      <div>
+        <h5 class="fw-semibold mb-3"><i class="bi bi-chat-dots text-success me-2"></i>Comentários ({{ comentarios|length }})</h5>
+
+        {% if user.is_authenticated %}
+        <div class="card border-0 bg-light mb-3">
+          <div class="card-body">
+            <div class="d-flex gap-3">
+              <div class="flex-shrink-0">
+                {% if user.foto_perfil %}
+                <img src="{{ user.foto_perfil }}" class="rounded-circle" width="40" height="40" style="object-fit:cover">
+                {% else %}
+                <div class="rounded-circle bg-success d-flex align-items-center justify-content-center text-white fw-bold"
+                     style="width:40px;height:40px">{{ user.username|first|upper }}</div>
+                {% endif %}
+              </div>
+              <div class="flex-grow-1">
+                <textarea id="novo-comentario" class="form-control border-0 bg-white" rows="2"
+                          placeholder="Compartilhe sua experiência..."></textarea>
+                <div class="text-end mt-2">
+                  <button class="btn btn-success btn-sm" onclick="enviarComentario({{ destino.pk }})">
+                    <i class="bi bi-send me-1"></i>Comentar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <div class="alert alert-light border mb-3">
+          <a href="/login/?next={{ request.path }}" class="text-success fw-semibold">Entre</a> para deixar um comentário.
+        </div>
+        {% endif %}
+
+        <div id="comentarios-list">
+          {% for c in comentarios %}
+          <div class="mb-3" id="comment-{{ c.pk }}">
+            <div class="d-flex gap-3">
+              <div class="flex-shrink-0">
+                {% if c.usuario.foto_perfil %}
+                <img src="{{ c.usuario.foto_perfil }}" class="rounded-circle" width="38" height="38" style="object-fit:cover">
+                {% else %}
+                <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center text-white fw-bold"
+                     style="width:38px;height:38px;font-size:.85rem">{{ c.usuario.username|first|upper }}</div>
+                {% endif %}
+              </div>
+              <div class="flex-grow-1">
+                <div class="card border-0 bg-light">
+                  <div class="card-body py-2 px-3">
+                    <div class="d-flex justify-content-between">
+                      <a href="/perfil/{{ c.usuario.pk }}/" class="fw-semibold text-dark text-decoration-none small">
+                        {{ c.usuario.get_full_name|default:c.usuario.username }}
+                      </a>
+                      <span class="text-muted small">{{ c.created_at|date:"d/m/Y H:i" }}</span>
+                    </div>
+                    <p class="mb-0 mt-1">{{ c.texto }}</p>
+                  </div>
+                </div>
+                <button class="btn btn-link btn-sm text-muted p-0 mt-1"
+                        onclick="toggleResposta({{ c.pk }})">
+                  <i class="bi bi-reply me-1"></i>Responder
+                </button>
+
+                <!-- Reply form -->
+                <div id="reply-form-{{ c.pk }}" style="display:none" class="mt-2">
+                  <div class="input-group">
+                    <input type="text" id="reply-text-{{ c.pk }}" class="form-control form-control-sm"
+                           placeholder="Sua resposta...">
+                    <button class="btn btn-success btn-sm"
+                            onclick="enviarResposta({{ destino.pk }}, {{ c.pk }})">Responder</button>
+                  </div>
+                </div>
+
+                <!-- Replies -->
+                {% if c.respostas.all %}
+                <div class="comment-thread mt-2">
+                  {% for r in c.respostas.all %}
+                  <div class="d-flex gap-2 mb-2">
+                    <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center text-white fw-bold flex-shrink-0"
+                         style="width:30px;height:30px;font-size:.75rem">{{ r.usuario.username|first|upper }}</div>
+                    <div class="card border-0 bg-white flex-grow-1">
+                      <div class="card-body py-1 px-2">
+                        <span class="fw-semibold small">{{ r.usuario.get_full_name|default:r.usuario.username }}</span>
+                        <span class="text-muted small ms-2">{{ r.created_at|date:"d/m H:i" }}</span>
+                        <p class="mb-0 small mt-1">{{ r.texto }}</p>
+                      </div>
+                    </div>
+                  </div>
+                  {% endfor %}
+                </div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          {% empty %}
+          <div class="text-center text-muted py-3">
+            <i class="bi bi-chat display-6"></i>
+            <p class="mt-2">Seja o primeiro a comentar!</p>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Right sidebar -->
+    <div class="col-lg-4">
+      <div class="card border-0 shadow-sm sticky-top" style="top:80px">
+        <div class="card-body">
+          <h6 class="fw-semibold mb-3"><i class="bi bi-info-circle text-success me-2"></i>Informações</h6>
+          <ul class="list-unstyled mb-0">
+            {% if destino.categoria %}
+            <li class="d-flex justify-content-between py-2 border-bottom">
+              <span class="text-muted">Tipo</span>
+              <span class="fw-semibold">{{ destino.categoria.get_nome_display }}</span>
+            </li>
+            {% endif %}
+            {% if destino.dificuldade %}
+            <li class="d-flex justify-content-between py-2 border-bottom">
+              <span class="text-muted">Dificuldade</span>
+              <span class="badge diff-{{ destino.dificuldade }}">{{ destino.get_dificuldade_display }}</span>
+            </li>
+            {% endif %}
+            {% if destino.distancia_km %}
+            <li class="d-flex justify-content-between py-2 border-bottom">
+              <span class="text-muted">Extensão</span>
+              <span class="fw-semibold">{{ destino.distancia_km }} km</span>
+            </li>
+            {% endif %}
+            <li class="d-flex justify-content-between py-2 border-bottom">
+              <span class="text-muted">Avaliação</span>
+              <span class="fw-semibold text-warning">{{ destino.media_avaliacao }} ★</span>
+            </li>
+            <li class="d-flex justify-content-between py-2 border-bottom">
+              <span class="text-muted">Grupos ativos</span>
+              <span class="fw-semibold">{{ grupos|length }}</span>
+            </li>
+            {% if destino.criador %}
+            <li class="d-flex justify-content-between py-2">
+              <span class="text-muted">Cadastrado por</span>
+              <a href="/perfil/{{ destino.criador.pk }}/" class="text-success text-decoration-none fw-semibold">
+                {{ destino.criador.get_full_name|default:destino.criador.username }}
+              </a>
+            </li>
+            {% endif %}
+          </ul>
+
+          <div class="d-grid gap-2 mt-3">
+            <a class="btn btn-success" onclick="tracarRota({{ destino.latitude }}, {{ destino.longitude }}); document.getElementById('map-detail').scrollIntoView({behavior:'smooth'})">
+              <i class="bi bi-signpost-2 me-2"></i>Como Chegar
+            </a>
+            {% if user.is_authenticated %}
+            <button class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#modalNovoGrupo">
+              <i class="bi bi-people me-2"></i>Criar Grupo de Expedição
+            </button>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Novo Grupo -->
+{% if user.is_authenticated %}
+<div class="modal fade" id="modalNovoGrupo" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-people-fill text-success me-2"></i>Criar Grupo de Expedição</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Nome do grupo *</label>
+          <input type="text" id="grupo-nome" class="form-control" placeholder="Ex: Trilheiros do Norte">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Descrição</label>
+          <textarea id="grupo-descricao" class="form-control" rows="3" placeholder="Detalhes da expedição..."></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Data da expedição</label>
+          <input type="datetime-local" id="grupo-data" class="form-control">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Vagas</label>
+          <input type="number" id="grupo-vagas" class="form-control" value="10" min="2" max="100">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-success" onclick="criarGrupo({{ destino.pk }})">
+          <i class="bi bi-plus-circle me-1"></i>Criar Grupo
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const DEST_LAT = {{ destino.latitude }};
+const DEST_LON = {{ destino.longitude }};
+const CSRF = '{{ csrf_token }}';
+let userLat = null, userLon = null;
+
+// Init detail map
+const map = L.map('map-detail').setView([DEST_LAT, DEST_LON], 13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap contributors'
+}).addTo(map);
+
+const destMarker = L.marker([DEST_LAT, DEST_LON])
+  .bindPopup('<b>{{ destino.nome }}</b>').addTo(map).openPopup();
+
+// Meeting points on map
+{% for p in pontos_encontro %}
+L.circleMarker([{{ p.latitude }}, {{ p.longitude }}], { color: '#fd7e14', radius: 8, fillOpacity: .8 })
+  .bindPopup('<b>{{ p.nome }}</b><br>{{ p.descricao|default:"" }}').addTo(map);
+{% endfor %}
+
+let routeLayer = null;
+function tracarRota(lat, lon) {
+  if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
+  navigator.geolocation.getCurrentPosition(pos => {
+    userLat = pos.coords.latitude;
+    userLon = pos.coords.longitude;
+    const userM = L.circleMarker([userLat, userLon], { color: '#0d6efd', radius: 8, fillOpacity: .8 })
+      .bindPopup('Você está aqui').addTo(map);
+    const url = `https://router.project-osrm.org/route/v1/driving/${userLon},${userLat};${lon},${lat}?overview=full&geometries=geojson`;
+    fetch(url)
+      .then(r => r.json())
+      .then(data => {
+        if (data.routes && data.routes[0]) {
+          routeLayer = L.geoJSON(data.routes[0].geometry, { style: { color: '#198754', weight: 4, opacity: .8 } }).addTo(map);
+          map.fitBounds(routeLayer.getBounds(), { padding: [30, 30] });
+          const dist = (data.routes[0].distance / 1000).toFixed(1);
+          const dur = Math.round(data.routes[0].duration / 60);
+          L.popup().setLatLng([lat, lon]).setContent(`<b>Rota</b><br>${dist} km · ~${dur} min`).openOn(map);
+        }
+      })
+      .catch(() => {
+        map.fitBounds([[userLat, userLon], [lat, lon]], { padding: [40, 40] });
+      });
+  }, () => alert('Habilite a localização para traçar rota.'));
+}
+
+function selectPhoto(el, url) {
+  document.getElementById('main-photo').src = url;
+  document.querySelectorAll('.gallery-thumb').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function toggleFavorito(id) {
+  fetch(`/api/destinos/${id}/favoritar/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' }
+  }).then(r => r.json()).then(d => {
+    const btn = document.getElementById('fav-btn');
+    if (d.favoritado) {
+      btn.className = 'btn btn-danger btn-sm';
+      btn.innerHTML = '<i class="bi bi-heart-fill me-1"></i>Favoritado';
+    } else {
+      btn.className = 'btn btn-outline-danger btn-sm';
+      btn.innerHTML = '<i class="bi bi-heart me-1"></i>Favoritar';
+    }
+  });
+}
+
+function avaliar(id, nota) {
+  fetch(`/api/destinos/${id}/avaliar/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nota })
+  }).then(r => r.json()).then(() => {
+    document.querySelectorAll('.star-btn').forEach((btn, i) => {
+      btn.classList.toggle('active', i < nota);
+    });
+  });
+}
+
+function enviarComentario(destinoId) {
+  const texto = document.getElementById('novo-comentario').value.trim();
+  if (!texto) return;
+  fetch(`/api/comentarios/destino/${destinoId}/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ texto })
+  }).then(r => r.json()).then(c => {
+    document.getElementById('novo-comentario').value = '';
+    location.reload();
+  });
+}
+
+function toggleResposta(id) {
+  const el = document.getElementById(`reply-form-${id}`);
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function enviarResposta(destinoId, parentId) {
+  const texto = document.getElementById(`reply-text-${parentId}`).value.trim();
+  if (!texto) return;
+  fetch(`/api/comentarios/destino/${destinoId}/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ texto, parent: parentId })
+  }).then(() => location.reload());
+}
+
+function criarGrupo(destinoId) {
+  const nome = document.getElementById('grupo-nome').value.trim();
+  if (!nome) { alert('Informe o nome do grupo.'); return; }
+  fetch('/api/grupos/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      nome,
+      descricao: document.getElementById('grupo-descricao').value,
+      data_expedicao: document.getElementById('grupo-data').value || null,
+      vagas: parseInt(document.getElementById('grupo-vagas').value),
+      destino_id: destinoId
+    })
+  }).then(r => r.json()).then(g => {
+    bootstrap.Modal.getInstance(document.getElementById('modalNovoGrupo')).hide();
+    location.reload();
+  });
+}
+</script>
+{% endblock %}

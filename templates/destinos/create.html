@@ -1,0 +1,165 @@
+{% extends 'base.html' %}
+{% block title %}Cadastrar Destino — ExploraBrasil{% endblock %}
+
+{% block extra_css %}
+<style>#map-pick { height: 360px; border-radius: .75rem; cursor: crosshair; }</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-5" style="max-width:760px">
+  <h2 class="fw-bold mb-1"><i class="bi bi-plus-circle text-success me-2"></i>Cadastrar Destino</h2>
+  <p class="text-muted mb-4">Compartilhe um lugar incrível com a comunidade. O destino será revisado antes de aparecer publicamente.</p>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-4">
+      <div class="mb-4">
+        <label class="form-label fw-semibold">Nome do destino *</label>
+        <input type="text" id="d-nome" class="form-control" placeholder="Ex: Trilha da Serra do Mar">
+      </div>
+      <div class="row g-3 mb-4">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Categoria *</label>
+          <select id="d-categoria" class="form-select">
+            <option value="">Selecione...</option>
+            {% for cat in categorias %}
+            <option value="{{ cat.pk }}">{{ cat.get_nome_display }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Dificuldade</label>
+          <select id="d-dificuldade" class="form-select">
+            <option value="">Não especificado</option>
+            <option value="facil">Fácil</option>
+            <option value="moderado">Moderado</option>
+            <option value="dificil">Difícil</option>
+          </select>
+        </div>
+      </div>
+      <div class="mb-4">
+        <label class="form-label fw-semibold">Descrição</label>
+        <textarea id="d-descricao" class="form-control" rows="4"
+                  placeholder="Descreva o local, características, o que levar, melhor época para visitar..."></textarea>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Extensão da trilha (km)</label>
+        <input type="number" id="d-distancia" class="form-control" step="0.1" placeholder="Ex: 8.5">
+      </div>
+
+      <hr class="my-4">
+
+      <h6 class="fw-semibold mb-2"><i class="bi bi-geo-alt text-success me-2"></i>Localização no mapa</h6>
+      <p class="text-muted small mb-2">Clique no mapa para marcar o ponto exato do destino.</p>
+      <div id="map-pick" class="mb-3 shadow-sm"></div>
+      <div class="row g-2 mb-4">
+        <div class="col-md-6">
+          <label class="form-label small">Latitude</label>
+          <input type="text" id="d-lat" class="form-control form-control-sm" placeholder="Ex: -26.3044" readonly>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small">Longitude</label>
+          <input type="text" id="d-lon" class="form-control form-control-sm" placeholder="Ex: -48.8486" readonly>
+        </div>
+      </div>
+
+      <hr class="my-4">
+
+      <h6 class="fw-semibold mb-2"><i class="bi bi-images text-success me-2"></i>Fotos (URLs)</h6>
+      <div id="fotos-container">
+        <div class="input-group mb-2">
+          <input type="url" class="form-control foto-url" placeholder="https://exemplo.com/foto.jpg">
+          <button type="button" class="btn btn-outline-danger" onclick="this.closest('.input-group').remove()">
+            <i class="bi bi-trash"></i>
+          </button>
+        </div>
+      </div>
+      <button type="button" class="btn btn-outline-secondary btn-sm mb-4" onclick="adicionarFoto()">
+        <i class="bi bi-plus me-1"></i>Adicionar foto
+      </button>
+
+      <div id="error-msg" class="alert alert-danger" style="display:none"></div>
+      <div id="success-msg" class="alert alert-success" style="display:none"></div>
+
+      <div class="d-flex gap-3">
+        <button type="button" class="btn btn-success px-4" onclick="salvarDestino()">
+          <i class="bi bi-send me-2"></i>Enviar para revisão
+        </button>
+        <a href="/destinos/" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CSRF = '{{ csrf_token }}';
+const map = L.map('map-pick').setView([-15.77, -47.93], 4);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'© OSM'}).addTo(map);
+let marker = null;
+
+map.on('click', e => {
+  const { lat, lng } = e.latlng;
+  document.getElementById('d-lat').value = lat.toFixed(6);
+  document.getElementById('d-lon').value = lng.toFixed(6);
+  if (marker) map.removeLayer(marker);
+  marker = L.marker([lat, lng]).bindPopup('Destino marcado aqui').addTo(map).openPopup();
+});
+
+function adicionarFoto() {
+  const div = document.createElement('div');
+  div.className = 'input-group mb-2';
+  div.innerHTML = `<input type="url" class="form-control foto-url" placeholder="https://exemplo.com/foto.jpg">
+    <button type="button" class="btn btn-outline-danger" onclick="this.closest('.input-group').remove()"><i class="bi bi-trash"></i></button>`;
+  document.getElementById('fotos-container').appendChild(div);
+}
+
+async function salvarDestino() {
+  const nome = document.getElementById('d-nome').value.trim();
+  const lat = document.getElementById('d-lat').value;
+  const lon = document.getElementById('d-lon').value;
+  const categoriaId = document.getElementById('d-categoria').value;
+  const errEl = document.getElementById('error-msg');
+  const sucEl = document.getElementById('success-msg');
+  errEl.style.display = 'none';
+  sucEl.style.display = 'none';
+
+  if (!nome) { errEl.textContent = 'Informe o nome do destino.'; errEl.style.display='block'; return; }
+  if (!lat || !lon) { errEl.textContent = 'Clique no mapa para marcar a localização.'; errEl.style.display='block'; return; }
+  if (!categoriaId) { errEl.textContent = 'Selecione uma categoria.'; errEl.style.display='block'; return; }
+
+  const fotos = [...document.querySelectorAll('.foto-url')].map(i => i.value.trim()).filter(Boolean);
+
+  const res = await fetch('/api/destinos/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      nome,
+      descricao: document.getElementById('d-descricao').value,
+      latitude: lat,
+      longitude: lon,
+      dificuldade: document.getElementById('d-dificuldade').value || null,
+      distancia_km: document.getElementById('d-distancia').value || null,
+      categoria_id: categoriaId,
+    })
+  });
+
+  if (res.ok) {
+    const destino = await res.json();
+    for (let [i, url] of fotos.entries()) {
+      await fetch('/api/destinos/' + destino.id + '/fotos/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, ordem: i })
+      }).catch(() => {});
+    }
+    sucEl.innerHTML = 'Destino enviado! Ele aparecerá no mapa após revisão. <a href="/destinos/">Ver destinos</a>';
+    sucEl.style.display = 'block';
+  } else {
+    const err = await res.json();
+    errEl.textContent = JSON.stringify(err);
+    errEl.style.display = 'block';
+  }
+}
+</script>
+{% endblock %}

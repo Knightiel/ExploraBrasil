@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block title %}Feed de Atividades — ExploraBrasil{% endblock %}
+
+{% block content %}
+<div class="container py-5" style="max-width:680px">
+  <h2 class="fw-bold mb-4"><i class="bi bi-activity text-success me-2"></i>Feed de Atividades</h2>
+
+  {% if atividades %}
+  <div class="d-flex flex-column gap-3">
+    {% for a in atividades %}
+    <div class="card border-0 shadow-sm">
+      <div class="card-body d-flex gap-3 align-items-start py-3">
+        <a href="/perfil/{{ a.usuario.pk }}/">
+          {% if a.usuario.foto_perfil %}
+          <img src="{{ a.usuario.foto_perfil }}" class="rounded-circle" width="44" height="44" style="object-fit:cover">
+          {% else %}
+          <div class="rounded-circle bg-success text-white d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
+               style="width:44px;height:44px">{{ a.usuario.username|first|upper }}</div>
+          {% endif %}
+        </a>
+        <div class="flex-grow-1">
+          <p class="mb-1">
+            <a href="/perfil/{{ a.usuario.pk }}/" class="fw-semibold text-dark text-decoration-none">
+              {{ a.usuario.get_full_name|default:a.usuario.username }}
+            </a>
+            <span class="text-muted">
+              {% if a.tipo == 'avaliou' %}avaliou o destino{% endif %}
+              {% if a.tipo == 'comentou' %}comentou em{% endif %}
+              {% if a.tipo == 'entrou_grupo' %}entrou no grupo{% endif %}
+              {% if a.tipo == 'favoritou' %}favoritou{% endif %}
+              {% if a.tipo == 'cadastrou_destino' %}cadastrou o destino{% endif %}
+              {% if a.tipo == 'criou_grupo' %}criou o grupo{% endif %}
+              {% if a.tipo == 'seguiu' %}passou a seguir{% endif %}
+            </span>
+            {% if a.destino %}
+            <a href="/destinos/{{ a.destino.pk }}/" class="text-success fw-semibold text-decoration-none ms-1">
+              {{ a.destino.nome }}
+            </a>
+            {% endif %}
+            {% if a.grupo %}
+            <a href="/grupos/{{ a.grupo.pk }}/" class="text-success fw-semibold text-decoration-none ms-1">
+              {{ a.grupo.nome }}
+            </a>
+            {% endif %}
+            {% if a.usuario_alvo %}
+            <a href="/perfil/{{ a.usuario_alvo.pk }}/" class="text-success fw-semibold text-decoration-none ms-1">
+              {{ a.usuario_alvo.get_full_name|default:a.usuario_alvo.username }}
+            </a>
+            {% endif %}
+          </p>
+          <small class="text-muted"><i class="bi bi-clock me-1"></i>{{ a.created_at|timesince }} atrás</small>
+        </div>
+        {% if a.destino and a.destino.foto_principal %}
+        <a href="/destinos/{{ a.destino.pk }}/">
+          <img src="{{ a.destino.foto_principal }}" class="rounded-2 flex-shrink-0" width="60" height="60" style="object-fit:cover">
+        </a>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center py-5 text-muted">
+    <i class="bi bi-activity display-3"></i>
+    <h4 class="mt-3">Feed vazio</h4>
+    <p>Siga outros exploradores para ver as atividades deles aqui.</p>
+    <a href="/destinos/" class="btn btn-success mt-2">
+      <i class="bi bi-compass me-2"></i>Descobrir exploradores
+    </a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,307 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}ExploraBrasil — Descubra o Brasil{% endblock %}
+
+{% block extra_css %}
+<style>
+  .hero {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    display: flex;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: url("{% static 'img/hero-bg.svg' %}") center/cover no-repeat;
+    opacity: 0.08;
+  }
+  .search-card {
+    background: rgba(255,255,255,0.07);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 1.5rem;
+  }
+  .cat-btn {
+    transition: all .2s;
+  }
+  .cat-btn:hover, .cat-btn.active {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(25,135,84,.35);
+  }
+  #map-preview {
+    height: 320px;
+    border-radius: 1rem;
+    border: 2px solid rgba(255,255,255,.1);
+  }
+  .stat-number { font-size: 2rem; font-weight: 700; color: #20c997; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero">
+  <div class="container py-5 position-relative">
+    <div class="row align-items-center g-5">
+
+      <!-- Left: search form -->
+      <div class="col-lg-5">
+        <p class="text-success text-uppercase fw-bold letter-spacing mb-2" style="letter-spacing:.15em">
+          <i class="bi bi-compass me-1"></i> Plataforma de Turismo
+        </p>
+        <h1 class="display-4 fw-bold text-white mb-3">
+          Descubra destinos <span class="text-success">incríveis</span> perto de você
+        </h1>
+        <p class="text-secondary fs-5 mb-4">
+          Trilhas, acampamentos e pontos turísticos em todo o Brasil.
+          Forme grupos de expedição e explore com a comunidade.
+        </p>
+
+        <div class="search-card p-4">
+          <form id="search-form" action="/destinos/" method="get">
+            <div class="mb-3">
+              <label class="text-white-50 small mb-1">Sua localização</label>
+              <div class="input-group">
+                <span class="input-group-text bg-dark border-secondary text-success">
+                  <i class="bi bi-geo-alt-fill"></i>
+                </span>
+                <input type="text" id="location-input" name="endereco"
+                       class="form-control bg-dark border-secondary text-white"
+                       placeholder="Ex: Joinville, SC ou use o GPS">
+                <input type="hidden" id="lat-input" name="lat">
+                <input type="hidden" id="lon-input" name="lon">
+                <button type="button" id="gps-btn" class="btn btn-outline-success" title="Usar GPS">
+                  <i class="bi bi-crosshair"></i>
+                </button>
+              </div>
+              <div id="gps-status" class="text-success small mt-1" style="display:none">
+                <i class="bi bi-check-circle me-1"></i><span></span>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="text-white-50 small mb-1">Raio de busca</label>
+              <select name="raio" class="form-select bg-dark border-secondary text-white">
+                <option value="10">10 km</option>
+                <option value="25">25 km</option>
+                <option value="50" selected>50 km</option>
+                <option value="100">100 km</option>
+                <option value="200">200 km</option>
+              </select>
+            </div>
+
+            <div class="mb-3">
+              <label class="text-white-50 small mb-1">Categoria</label>
+              <div class="d-flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-outline-light btn-sm cat-btn" data-cat="">
+                  <i class="bi bi-grid me-1"></i>Todos
+                </button>
+                {% for cat in categorias %}
+                <button type="button" class="btn btn-outline-success btn-sm cat-btn" data-cat="{{ cat.nome }}">
+                  <i class="bi {{ cat.icone }} me-1"></i>{{ cat.get_nome_display }}
+                </button>
+                {% endfor %}
+              </div>
+              <input type="hidden" id="categoria-input" name="categoria">
+            </div>
+
+            <button type="submit" class="btn btn-success w-100 py-2 fw-semibold">
+              <i class="bi bi-search me-2"></i>Buscar Destinos
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Right: map preview -->
+      <div class="col-lg-7">
+        <div id="map-preview"></div>
+        <p class="text-center text-secondary small mt-2">
+          <i class="bi bi-info-circle me-1"></i>Mapa com destinos cadastrados na plataforma
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Stats Section -->
+<section class="py-5 bg-dark">
+  <div class="container">
+    <div class="row text-center g-4">
+      <div class="col-md-4">
+        <div class="stat-number" id="stat-destinos">—</div>
+        <p class="text-secondary mb-0">Destinos Cadastrados</p>
+      </div>
+      <div class="col-md-4">
+        <div class="stat-number" id="stat-grupos">—</div>
+        <p class="text-secondary mb-0">Grupos de Expedição</p>
+      </div>
+      <div class="col-md-4">
+        <div class="stat-number" id="stat-usuarios">—</div>
+        <p class="text-secondary mb-0">Exploradores Ativos</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Recent Destinations Section -->
+<section class="py-5">
+  <div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h2 class="fw-bold mb-0">Destinos em Destaque</h2>
+      <a href="/destinos/" class="btn btn-outline-success btn-sm">Ver todos <i class="bi bi-arrow-right ms-1"></i></a>
+    </div>
+    <div class="row g-4" id="destinos-destaque">
+      <div class="col-12 text-center py-5">
+        <div class="spinner-border text-success" role="status"></div>
+        <p class="text-muted mt-2">Carregando destinos...</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- How it works -->
+<section class="py-5 bg-light">
+  <div class="container">
+    <h2 class="fw-bold text-center mb-5">Como funciona</h2>
+    <div class="row g-4 text-center">
+      <div class="col-md-3">
+        <div class="rounded-circle bg-success bg-opacity-10 d-inline-flex align-items-center justify-content-center mb-3" style="width:72px;height:72px">
+          <i class="bi bi-geo-alt text-success fs-2"></i>
+        </div>
+        <h5 class="fw-semibold">Informe sua localização</h5>
+        <p class="text-muted small">Use o GPS ou digite sua cidade para encontrar destinos próximos</p>
+      </div>
+      <div class="col-md-3">
+        <div class="rounded-circle bg-success bg-opacity-10 d-inline-flex align-items-center justify-content-center mb-3" style="width:72px;height:72px">
+          <i class="bi bi-map text-success fs-2"></i>
+        </div>
+        <h5 class="fw-semibold">Explore o mapa</h5>
+        <p class="text-muted small">Visualize trilhas, acampamentos e pontos turísticos no mapa interativo</p>
+      </div>
+      <div class="col-md-3">
+        <div class="rounded-circle bg-success bg-opacity-10 d-inline-flex align-items-center justify-content-center mb-3" style="width:72px;height:72px">
+          <i class="bi bi-people text-success fs-2"></i>
+        </div>
+        <h5 class="fw-semibold">Forme um grupo</h5>
+        <p class="text-muted small">Crie ou entre em grupos de expedição e organize a aventura</p>
+      </div>
+      <div class="col-md-3">
+        <div class="rounded-circle bg-success bg-opacity-10 d-inline-flex align-items-center justify-content-center mb-3" style="width:72px;height:72px">
+          <i class="bi bi-star text-success fs-2"></i>
+        </div>
+        <h5 class="fw-semibold">Avalie e compartilhe</h5>
+        <p class="text-muted small">Deixe comentários, fotos e avaliações para ajudar a comunidade</p>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const map = L.map('map-preview', { zoomControl: true }).setView([-15.77, -47.93], 4);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap contributors'
+}).addTo(map);
+
+// Load destinations on map
+fetch('/api/destinos/')
+  .then(r => r.json())
+  .then(data => {
+    const destinos = Array.isArray(data) ? data : (data.results || []);
+    document.getElementById('stat-destinos').textContent = destinos.length;
+    destinos.forEach(d => {
+      const icon = L.divIcon({
+        html: `<div class="map-marker"><i class="bi bi-geo-alt-fill text-success fs-5"></i></div>`,
+        className: '', iconAnchor: [12, 24]
+      });
+      L.marker([parseFloat(d.latitude), parseFloat(d.longitude)], {icon})
+        .bindPopup(`<b>${d.nome}</b><br><a href="/destinos/${d.id}/" class="text-success">Ver detalhes</a>`)
+        .addTo(map);
+    });
+
+    // Render featured cards
+    const container = document.getElementById('destinos-destaque');
+    if (destinos.length === 0) {
+      container.innerHTML = '<div class="col-12 text-center text-muted py-4">Nenhum destino cadastrado ainda. <a href="/destinos/novo/">Seja o primeiro!</a></div>';
+      return;
+    }
+    container.innerHTML = destinos.slice(0, 6).map(d => destinoCard(d)).join('');
+  })
+  .catch(() => {
+    document.getElementById('destinos-destaque').innerHTML =
+      '<div class="col-12 text-center text-muted">Não foi possível carregar os destinos.</div>';
+  });
+
+// Load stats
+fetch('/api/grupos/').then(r => r.json()).then(d => {
+  const grupos = Array.isArray(d) ? d : (d.results || []);
+  document.getElementById('stat-grupos').textContent = grupos.length;
+});
+document.getElementById('stat-usuarios').textContent = '—';
+
+function destinoCard(d) {
+  const foto = d.foto_principal || 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&q=80';
+  const estrelas = '★'.repeat(Math.round(d.media_avaliacao || 0)) + '☆'.repeat(5 - Math.round(d.media_avaliacao || 0));
+  const dif = { facil: 'success', moderado: 'warning', dificil: 'danger' }[d.dificuldade] || 'secondary';
+  return `
+    <div class="col-sm-6 col-lg-4">
+      <a href="/destinos/${d.id}/" class="card h-100 text-decoration-none border-0 shadow-sm dest-card">
+        <div class="position-relative overflow-hidden" style="height:180px">
+          <img src="${foto}" class="card-img-top h-100 w-100" style="object-fit:cover" alt="${d.nome}">
+          ${d.categoria ? `<span class="badge bg-dark position-absolute top-0 start-0 m-2">${d.categoria.nome === 'trilha' ? '🥾 Trilha' : d.categoria.nome === 'acampamento' ? '⛺ Acampamento' : '📍 Ponto Turístico'}</span>` : ''}
+          ${d.dificuldade ? `<span class="badge bg-${dif} position-absolute top-0 end-0 m-2">${d.dificuldade}</span>` : ''}
+        </div>
+        <div class="card-body">
+          <h6 class="card-title fw-bold text-dark">${d.nome}</h6>
+          <p class="card-text text-muted small mb-2">${d.descricao ? d.descricao.substring(0, 80) + '...' : ''}</p>
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="text-warning small">${estrelas} <span class="text-muted">(${d.total_avaliacoes})</span></span>
+            ${d.distancia != null ? `<span class="badge bg-success bg-opacity-10 text-success">${d.distancia} km</span>` : ''}
+          </div>
+        </div>
+      </a>
+    </div>`;
+}
+
+// GPS button
+document.getElementById('gps-btn').addEventListener('click', () => {
+  const btn = document.getElementById('gps-btn');
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+  btn.disabled = true;
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const { latitude, longitude } = pos.coords;
+      document.getElementById('lat-input').value = latitude;
+      document.getElementById('lon-input').value = longitude;
+      document.getElementById('location-input').value = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+      map.setView([latitude, longitude], 10);
+      L.circleMarker([latitude, longitude], { color: '#198754', radius: 8, fillOpacity: 0.8 })
+        .bindPopup('Você está aqui').addTo(map).openPopup();
+      document.getElementById('gps-status').style.display = 'block';
+      document.getElementById('gps-status').querySelector('span').textContent = 'Localização capturada com sucesso';
+      btn.innerHTML = '<i class="bi bi-crosshair"></i>';
+      btn.disabled = false;
+    },
+    () => {
+      btn.innerHTML = '<i class="bi bi-crosshair"></i>';
+      btn.disabled = false;
+      alert('Não foi possível obter sua localização. Tente digitar o endereço.');
+    }
+  );
+});
+
+// Category buttons
+document.querySelectorAll('.cat-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('categoria-input').value = btn.dataset.cat;
+  });
+});
+</script>
+{% endblock %}
