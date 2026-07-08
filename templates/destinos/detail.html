@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}{{ destino.nome }} — ExploraBrasil{% endblock %}
+{% block title %}{{ destino.nome }} — GeoTrail{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -43,7 +43,7 @@
         <div class="d-flex gap-2 mt-2 flex-wrap">
           {% for foto in destino.fotos.all %}
           <img src="{{ foto.url }}" class="gallery-thumb {% if forloop.first %}active{% endif %}"
-               onclick="selectPhoto(this, '{{ foto.url }}')" alt="{{ foto.legenda }}">
+               data-action="select-photo" data-url="{{ foto.url|escapejs }}" alt="{{ foto.legenda }}">
           {% endfor %}
         </div>
         {% endif %}
@@ -78,13 +78,13 @@
         <div class="d-flex gap-2">
           {% if user.is_authenticated %}
           <button id="fav-btn" class="btn {% if favoritado %}btn-danger{% else %}btn-outline-danger{% endif %} btn-sm"
-                  onclick="toggleFavorito({{ destino.pk }})">
+                  data-action="toggle-favorito" data-id="{{ destino.pk }}">
             <i class="bi bi-heart{% if favoritado %}-fill{% endif %} me-1"></i>
             {% if favoritado %}Favoritado{% else %}Favoritar{% endif %}
           </button>
           {% endif %}
           <a id="rota-btn" class="btn btn-success btn-sm" href="#map-detail"
-             onclick="tracarRota({{ destino.latitude }}, {{ destino.longitude }})">
+             data-action="tracar-rota" data-lat="{{ destino.latitude|escapejs }}" data-lon="{{ destino.longitude|escapejs }}">
             <i class="bi bi-signpost-2 me-1"></i>Traçar Rota
           </a>
         </div>
@@ -106,8 +106,7 @@
           <span class="text-muted small">Sua nota:</span>
           {% for i in "12345" %}
           <button class="star-btn {% if forloop.counter <= minha_nota %}active{% endif %}"
-                  data-nota="{{ forloop.counter }}"
-                  onclick="avaliar({{ destino.pk }}, {{ forloop.counter }})">★</button>
+                  data-action="avaliar" data-id="{{ destino.pk }}" data-nota="{{ forloop.counter }}">★</button>
           {% endfor %}
         </div>
         {% endif %}
@@ -215,7 +214,7 @@
                 <textarea id="novo-comentario" class="form-control border-0 bg-white" rows="2"
                           placeholder="Compartilhe sua experiência..."></textarea>
                 <div class="text-end mt-2">
-                  <button class="btn btn-success btn-sm" onclick="enviarComentario({{ destino.pk }})">
+                  <button class="btn btn-success btn-sm" data-action="enviar-comentario" data-id="{{ destino.pk }}">
                     <i class="bi bi-send me-1"></i>Comentar
                   </button>
                 </div>
@@ -254,7 +253,7 @@
                   </div>
                 </div>
                 <button class="btn btn-link btn-sm text-muted p-0 mt-1"
-                        onclick="toggleResposta({{ c.pk }})">
+                        data-action="toggle-resposta" data-id="{{ c.pk }}">
                   <i class="bi bi-reply me-1"></i>Responder
                 </button>
 
@@ -264,7 +263,7 @@
                     <input type="text" id="reply-text-{{ c.pk }}" class="form-control form-control-sm"
                            placeholder="Sua resposta...">
                     <button class="btn btn-success btn-sm"
-                            onclick="enviarResposta({{ destino.pk }}, {{ c.pk }})">Responder</button>
+                            data-action="enviar-resposta" data-id="{{ destino.pk }}" data-parent-id="{{ c.pk }}">Responder</button>
                   </div>
                 </div>
 
@@ -342,7 +341,7 @@
           </ul>
 
           <div class="d-grid gap-2 mt-3">
-            <a class="btn btn-success" onclick="tracarRota({{ destino.latitude }}, {{ destino.longitude }}); document.getElementById('map-detail').scrollIntoView({behavior:'smooth'})">
+            <a class="btn btn-success" href="#map-detail" data-action="tracar-rota" data-lat="{{ destino.latitude|escapejs }}" data-lon="{{ destino.longitude|escapejs }}">
               <i class="bi bi-signpost-2 me-2"></i>Como Chegar
             </a>
             {% if user.is_authenticated %}
@@ -386,7 +385,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-        <button type="button" class="btn btn-success" onclick="criarGrupo({{ destino.pk }})">
+        <button type="button" class="btn btn-success" data-action="criar-grupo" data-id="{{ destino.pk }}">
           <i class="bi bi-plus-circle me-1"></i>Criar Grupo
         </button>
       </div>
@@ -398,34 +397,42 @@
 
 {% block extra_js %}
 <script>
-const DEST_LAT = {{ destino.latitude }};
-const DEST_LON = {{ destino.longitude }};
-const CSRF = '{{ csrf_token }}';
-let userLat = null, userLon = null;
+const CSRF = '{{ csrf_token|escapejs }}';
+const DEST_LAT = parseFloat('{{ destino.latitude|default_if_none:0|escapejs }}') || 0;
+const DEST_LON = parseFloat('{{ destino.longitude|default_if_none:0|escapejs }}') || 0;
+let userLat = null;
+let userLon = null;
+let routeLayer = null;
 
-// Init detail map
 const map = L.map('map-detail').setView([DEST_LAT, DEST_LON], 13);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '© OpenStreetMap contributors'
 }).addTo(map);
 
-const destMarker = L.marker([DEST_LAT, DEST_LON])
-  .bindPopup('<b>{{ destino.nome }}</b>').addTo(map).openPopup();
+L.marker([DEST_LAT, DEST_LON])
+  .bindPopup('<b>{{ destino.nome|escapejs }}</b>')
+  .addTo(map)
+  .openPopup();
 
-// Meeting points on map
 {% for p in pontos_encontro %}
 L.circleMarker([{{ p.latitude }}, {{ p.longitude }}], { color: '#fd7e14', radius: 8, fillOpacity: .8 })
-  .bindPopup('<b>{{ p.nome }}</b><br>{{ p.descricao|default:"" }}').addTo(map);
+  .bindPopup('<b>{{ p.nome|escapejs }}</b><br>{{ p.descricao|default:""|escapejs }}')
+  .addTo(map);
 {% endfor %}
 
-let routeLayer = null;
-function tracarRota(lat, lon) {
-  if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
+window.tracarRota = function(lat, lon) {
+  if (routeLayer) {
+    map.removeLayer(routeLayer);
+    routeLayer = null;
+  }
+
   navigator.geolocation.getCurrentPosition(pos => {
     userLat = pos.coords.latitude;
     userLon = pos.coords.longitude;
-    const userM = L.circleMarker([userLat, userLon], { color: '#0d6efd', radius: 8, fillOpacity: .8 })
-      .bindPopup('Você está aqui').addTo(map);
+    L.circleMarker([userLat, userLon], { color: '#0d6efd', radius: 8, fillOpacity: .8 })
+      .bindPopup('Você está aqui')
+      .addTo(map);
+
     const url = `https://router.project-osrm.org/route/v1/driving/${userLon},${userLat};${lon},${lat}?overview=full&geometries=geojson`;
     fetch(url)
       .then(r => r.json())
@@ -442,20 +449,24 @@ function tracarRota(lat, lon) {
         map.fitBounds([[userLat, userLon], [lat, lon]], { padding: [40, 40] });
       });
   }, () => alert('Habilite a localização para traçar rota.'));
-}
+};
 
-function selectPhoto(el, url) {
-  document.getElementById('main-photo').src = url;
+window.selectPhoto = function(el) {
+  const url = el.dataset.url;
+  const mainPhoto = document.getElementById('main-photo');
+  if (!mainPhoto || !url) return;
+  mainPhoto.src = url;
   document.querySelectorAll('.gallery-thumb').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
-}
+};
 
-function toggleFavorito(id) {
+window.toggleFavorito = function(id) {
   fetch(`/api/destinos/${id}/favoritar/`, {
     method: 'POST',
     headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' }
   }).then(r => r.json()).then(d => {
     const btn = document.getElementById('fav-btn');
+    if (!btn) return;
     if (d.favoritado) {
       btn.className = 'btn btn-danger btn-sm';
       btn.innerHTML = '<i class="bi bi-heart-fill me-1"></i>Favoritado';
@@ -464,9 +475,9 @@ function toggleFavorito(id) {
       btn.innerHTML = '<i class="bi bi-heart me-1"></i>Favoritar';
     }
   });
-}
+};
 
-function avaliar(id, nota) {
+window.avaliar = function(id, nota) {
   fetch(`/api/destinos/${id}/avaliar/`, {
     method: 'POST',
     headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
@@ -476,27 +487,28 @@ function avaliar(id, nota) {
       btn.classList.toggle('active', i < nota);
     });
   });
-}
+};
 
-function enviarComentario(destinoId) {
+window.enviarComentario = function(destinoId) {
   const texto = document.getElementById('novo-comentario').value.trim();
   if (!texto) return;
   fetch(`/api/comentarios/destino/${destinoId}/`, {
     method: 'POST',
     headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
     body: JSON.stringify({ texto })
-  }).then(r => r.json()).then(c => {
+  }).then(r => r.json()).then(() => {
     document.getElementById('novo-comentario').value = '';
     location.reload();
   });
-}
+};
 
-function toggleResposta(id) {
+window.toggleResposta = function(id) {
   const el = document.getElementById(`reply-form-${id}`);
+  if (!el) return;
   el.style.display = el.style.display === 'none' ? 'block' : 'none';
-}
+};
 
-function enviarResposta(destinoId, parentId) {
+window.enviarResposta = function(destinoId, parentId) {
   const texto = document.getElementById(`reply-text-${parentId}`).value.trim();
   if (!texto) return;
   fetch(`/api/comentarios/destino/${destinoId}/`, {
@@ -504,9 +516,9 @@ function enviarResposta(destinoId, parentId) {
     headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
     body: JSON.stringify({ texto, parent: parentId })
   }).then(() => location.reload());
-}
+};
 
-function criarGrupo(destinoId) {
+window.criarGrupo = function(destinoId) {
   const nome = document.getElementById('grupo-nome').value.trim();
   if (!nome) { alert('Informe o nome do grupo.'); return; }
   fetch('/api/grupos/', {
@@ -516,13 +528,62 @@ function criarGrupo(destinoId) {
       nome,
       descricao: document.getElementById('grupo-descricao').value,
       data_expedicao: document.getElementById('grupo-data').value || null,
-      vagas: parseInt(document.getElementById('grupo-vagas').value),
+      vagas: parseInt(document.getElementById('grupo-vagas').value, 10),
       destino_id: destinoId
     })
-  }).then(r => r.json()).then(g => {
-    bootstrap.Modal.getInstance(document.getElementById('modalNovoGrupo')).hide();
+  }).then(r => r.json()).then(() => {
+    const modalEl = document.getElementById('modalNovoGrupo');
+    if (modalEl) {
+      bootstrap.Modal.getInstance(modalEl)?.hide();
+    }
     location.reload();
   });
-}
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.body.addEventListener('click', (event) => {
+    const trigger = event.target.closest('[data-action]');
+    if (!trigger) return;
+
+    const action = trigger.dataset.action;
+    switch (action) {
+      case 'select-photo':
+        event.preventDefault();
+        window.selectPhoto(trigger);
+        break;
+      case 'toggle-favorito':
+        event.preventDefault();
+        window.toggleFavorito(trigger.dataset.id);
+        break;
+      case 'tracar-rota':
+        event.preventDefault();
+        window.tracarRota(parseFloat(trigger.dataset.lat) || 0, parseFloat(trigger.dataset.lon) || 0);
+        document.getElementById('map-detail')?.scrollIntoView({ behavior: 'smooth' });
+        break;
+      case 'avaliar':
+        event.preventDefault();
+        window.avaliar(trigger.dataset.id, parseInt(trigger.dataset.nota, 10));
+        break;
+      case 'enviar-comentario':
+        event.preventDefault();
+        window.enviarComentario(trigger.dataset.id);
+        break;
+      case 'toggle-resposta':
+        event.preventDefault();
+        window.toggleResposta(trigger.dataset.id);
+        break;
+      case 'enviar-resposta':
+        event.preventDefault();
+        window.enviarResposta(trigger.dataset.id, trigger.dataset.parentId);
+        break;
+      case 'criar-grupo':
+        event.preventDefault();
+        window.criarGrupo(trigger.dataset.id);
+        break;
+      default:
+        break;
+    }
+  });
+});
 </script>
 {% endblock %}

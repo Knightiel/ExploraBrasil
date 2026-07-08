@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}Cadastrar Destino — ExploraBrasil{% endblock %}
+{% block title %}Cadastrar Destino — GeoTrail{% endblock %}
 
 {% block extra_css %}
 <style>#map-pick { height: 360px; border-radius: .75rem; cursor: crosshair; }</style>
@@ -68,12 +68,12 @@
       <div id="fotos-container">
         <div class="input-group mb-2">
           <input type="url" class="form-control foto-url" placeholder="https://exemplo.com/foto.jpg">
-          <button type="button" class="btn btn-outline-danger" onclick="this.closest('.input-group').remove()">
+          <button type="button" class="btn btn-outline-danger" data-action="remover-foto">
             <i class="bi bi-trash"></i>
           </button>
         </div>
       </div>
-      <button type="button" class="btn btn-outline-secondary btn-sm mb-4" onclick="adicionarFoto()">
+      <button type="button" class="btn btn-outline-secondary btn-sm mb-4" data-action="adicionar-foto">
         <i class="bi bi-plus me-1"></i>Adicionar foto
       </button>
 
@@ -81,7 +81,7 @@
       <div id="success-msg" class="alert alert-success" style="display:none"></div>
 
       <div class="d-flex gap-3">
-        <button type="button" class="btn btn-success px-4" onclick="salvarDestino()">
+        <button type="button" class="btn btn-success px-4" data-action="salvar-destino">
           <i class="bi bi-send me-2"></i>Enviar para revisão
         </button>
         <a href="/destinos/" class="btn btn-outline-secondary">Cancelar</a>
@@ -93,7 +93,7 @@
 
 {% block extra_js %}
 <script>
-const CSRF = '{{ csrf_token }}';
+const CSRF = '{{ csrf_token|escapejs }}';
 const map = L.map('map-pick').setView([-15.77, -47.93], 4);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'© OSM'}).addTo(map);
 let marker = null;
@@ -106,15 +106,15 @@ map.on('click', e => {
   marker = L.marker([lat, lng]).bindPopup('Destino marcado aqui').addTo(map).openPopup();
 });
 
-function adicionarFoto() {
+window.adicionarFoto = function() {
   const div = document.createElement('div');
   div.className = 'input-group mb-2';
   div.innerHTML = `<input type="url" class="form-control foto-url" placeholder="https://exemplo.com/foto.jpg">
-    <button type="button" class="btn btn-outline-danger" onclick="this.closest('.input-group').remove()"><i class="bi bi-trash"></i></button>`;
+    <button type="button" class="btn btn-outline-danger" data-action="remover-foto"><i class="bi bi-trash"></i></button>`;
   document.getElementById('fotos-container').appendChild(div);
-}
+};
 
-async function salvarDestino() {
+window.salvarDestino = async function() {
   const nome = document.getElementById('d-nome').value.trim();
   const lat = document.getElementById('d-lat').value;
   const lon = document.getElementById('d-lon').value;
@@ -160,6 +160,30 @@ async function salvarDestino() {
     errEl.textContent = JSON.stringify(err);
     errEl.style.display = 'block';
   }
-}
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.body.addEventListener('click', (event) => {
+    const trigger = event.target.closest('[data-action]');
+    if (!trigger) return;
+
+    switch (trigger.dataset.action) {
+      case 'adicionar-foto':
+        event.preventDefault();
+        window.adicionarFoto();
+        break;
+      case 'remover-foto':
+        event.preventDefault();
+        trigger.closest('.input-group')?.remove();
+        break;
+      case 'salvar-destino':
+        event.preventDefault();
+        window.salvarDestino();
+        break;
+      default:
+        break;
+    }
+  });
+});
 </script>
 {% endblock %}

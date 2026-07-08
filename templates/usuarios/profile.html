@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}{{ perfil.get_full_name|default:perfil.username }} — ExploraBrasil{% endblock %}
+{% block title %}{{ perfil.get_full_name|default:perfil.username }} — GeoTrail{% endblock %}
 
 {% block content %}
 <div class="container py-5">
@@ -35,7 +35,7 @@
         {% if user.is_authenticated and user.pk != perfil.pk %}
         <button id="follow-btn"
                 class="btn {% if seguindo %}btn-outline-success{% else %}btn-success{% endif %}"
-                onclick="toggleSeguir({{ perfil.pk }})">
+                data-action="toggle-seguir" data-id="{{ perfil.pk }}">
           <i class="bi bi-person-{% if seguindo %}check{% else %}plus{% endif %} me-1"></i>
           {% if seguindo %}Seguindo{% else %}Seguir{% endif %}
         </button>
@@ -108,13 +108,14 @@
 
 {% block extra_js %}
 <script>
-const CSRF = '{{ csrf_token }}';
-function toggleSeguir(id) {
+const CSRF = '{{ csrf_token|escapejs }}';
+window.toggleSeguir = function(id) {
   fetch(`/api/auth/usuarios/${id}/seguir/`, {
     method: 'POST',
     headers: { 'X-CSRFToken': CSRF }
   }).then(r => r.json()).then(d => {
     const btn = document.getElementById('follow-btn');
+    if (!btn) return;
     if (d.seguindo) {
       btn.className = 'btn btn-outline-success';
       btn.innerHTML = '<i class="bi bi-person-check me-1"></i>Seguindo';
@@ -123,6 +124,15 @@ function toggleSeguir(id) {
       btn.innerHTML = '<i class="bi bi-person-plus me-1"></i>Seguir';
     }
   });
-}
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.body.addEventListener('click', (event) => {
+    const trigger = event.target.closest('[data-action]');
+    if (!trigger || trigger.dataset.action !== 'toggle-seguir') return;
+    event.preventDefault();
+    window.toggleSeguir(trigger.dataset.id);
+  });
+});
 </script>
 {% endblock %}

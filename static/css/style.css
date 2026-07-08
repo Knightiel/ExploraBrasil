@@ -1,7 +1,10 @@
-/* ExploraBrasil – custom styles */
+/* GeoTrail – custom styles */
 
 body {
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Navbar */
@@ -38,8 +41,19 @@ body {
 .text-success { color: #198754 !important; }
 
 /* Hero section */
-.hero { padding-top: 72px; }
+.hero {
+  padding-top: 0;
+  margin-top: 0;
+  background-color: #16213e;
+}
 
+main {
+  flex: 1;
+}
+
+footer {
+  margin-top: auto;
+}
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: #f1f1f1; }

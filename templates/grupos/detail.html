@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}{{ grupo.nome }} — ExploraBrasil{% endblock %}
+{% block title %}{{ grupo.nome }} — GeoTrail{% endblock %}
 
 {% block extra_css %}
 <style>#map-grupo { height: 280px; border-radius: .75rem; }</style>
@@ -66,7 +66,7 @@
           {% if user.is_authenticated %}
           <button id="join-btn"
                   class="btn {% if membro %}btn-outline-danger{% else %}btn-success{% endif %} px-4"
-                  onclick="toggleEntrar({{ grupo.pk }})">
+                  data-action="toggle-entrar" data-id="{{ grupo.pk }}">
             <i class="bi bi-{% if membro %}box-arrow-right{% else %}person-plus{% endif %} me-2"></i>
             {% if membro %}Sair do grupo{% else %}Entrar no grupo{% endif %}
           </button>
@@ -192,7 +192,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-        <button type="button" class="btn btn-success" onclick="adicionarPonto({{ grupo.pk }})">Adicionar</button>
+        <button type="button" class="btn btn-success" data-action="adicionar-ponto" data-id="{{ grupo.pk }}">Adicionar</button>
       </div>
     </div>
   </div>
@@ -202,24 +202,25 @@
 
 {% block extra_js %}
 <script>
-const CSRF = '{{ csrf_token }}';
-const DEST_LAT = {{ grupo.destino.latitude }};
-const DEST_LON = {{ grupo.destino.longitude }};
+const CSRF = '{{ csrf_token|escapejs }}';
+const DEST_LAT = parseFloat('{{ grupo.destino.latitude|default_if_none:0|escapejs }}') || 0;
+const DEST_LON = parseFloat('{{ grupo.destino.longitude|default_if_none:0|escapejs }}') || 0;
 
 const map = L.map('map-grupo').setView([DEST_LAT, DEST_LON], 12);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'© OSM'}).addTo(map);
-L.marker([DEST_LAT, DEST_LON]).bindPopup('{{ grupo.destino.nome }}').addTo(map);
+L.marker([DEST_LAT, DEST_LON]).bindPopup('{{ grupo.destino.nome|escapejs }}').addTo(map);
 
 {% for p in pontos %}
 L.circleMarker([{{ p.latitude }}, {{ p.longitude }}], {color:'#fd7e14',radius:8,fillOpacity:.8})
-  .bindPopup('<b>{{ p.nome }}</b>').addTo(map);
+  .bindPopup('<b>{{ p.nome|escapejs }}</b>').addTo(map);
 {% endfor %}
 
-function toggleEntrar(id) {
+window.toggleEntrar = function(id) {
   fetch(`/api/grupos/${id}/entrar/`, {
     method: 'POST', headers: { 'X-CSRFToken': CSRF }
   }).then(r => r.json()).then(d => {
     const btn = document.getElementById('join-btn');
+    if (!btn) return;
     if (d.membro) {
       btn.className = 'btn btn-outline-danger px-4';
       btn.innerHTML = '<i class="bi bi-box-arrow-right me-2"></i>Sair do grupo';
@@ -227,10 +228,10 @@ function toggleEntrar(id) {
       btn.className = 'btn btn-success px-4';
       btn.innerHTML = '<i class="bi bi-person-plus me-2"></i>Entrar no grupo';
     }
-  }).catch(e => alert(e.error || 'Erro ao entrar no grupo.'));
-}
+  }).catch(() => alert('Erro ao entrar no grupo.'));
+};
 
-function adicionarPonto(grupoId) {
+window.adicionarPonto = function(grupoId) {
   const nome = document.getElementById('p-nome').value.trim();
   const lat = document.getElementById('p-lat').value.trim();
   const lon = document.getElementById('p-lon').value.trim();
@@ -240,6 +241,22 @@ function adicionarPonto(grupoId) {
     headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
     body: JSON.stringify({ nome, descricao: document.getElementById('p-desc').value, latitude: lat, longitude: lon })
   }).then(() => location.reload());
-}
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.body.addEventListener('click', (event) => {
+    const trigger = event.target.closest('[data-action]');
+    if (!trigger) return;
+
+    const action = trigger.dataset.action;
+    if (action === 'toggle-entrar') {
+      event.preventDefault();
+      window.toggleEntrar(trigger.dataset.id);
+    } else if (action === 'adicionar-ponto') {
+      event.preventDefault();
+      window.adicionarPonto(trigger.dataset.id);
+    }
+  });
+});
 </script>
 {% endblock %}

@@ -1,0 +1,66 @@
+# Python
+*.py[cod]
+*.$py.class
+__pycache__/
+*.so
+*.dylib
+*.pyd
+.Python
+env/
+venv/
+ENV/
+.venv/
+*.python-version
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+static/
+
+# Environment
+.env
+*.env
+
+# Pytest
+.pytest_cache/
+
+# IDEs and editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Coverage
+htmlcov/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*,cover
+
+# Build
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Misc
+*.log
+*.pot
+*.pyc
+*.pyo

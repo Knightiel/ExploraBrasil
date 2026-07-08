@@ -89,11 +89,11 @@ class Command(BaseCommand):
         admin, created = Usuario.objects.get_or_create(
             username='admin',
             defaults={'email': 'admin@explorabrasil.com', 'first_name': 'Admin',
-                      'last_name': 'ExploraBrasil', 'is_staff': True, 'is_superuser': True}
+                      'last_name': 'GeoTrail', 'is_staff': True, 'is_superuser': True}
         )
         if created:
             admin.set_password('admin123')
-            admin.bio = 'Administrador da plataforma ExploraBrasil'
+            admin.bio = 'Administrador da plataforma GeoTrail'
             admin.save()
 
         # Demo users
